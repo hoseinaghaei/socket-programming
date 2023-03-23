@@ -9,63 +9,60 @@ seeders = {}
 seeders_lock = thread.Lock()
 files = {}
 files_lock = thread.Lock()
-get_file_logs = {}
-get_file_lock = thread.Lock()
-share_file_logs = {}
-share_file_lock = thread.Lock()
-file_logs = {}
-file_logs_lock = thread.Lock()
-print_lock = thread.Lock()
 
-HEARTBEAT_TIMEOUT = 30
+print_lock = thread.Lock()
 
 
 def msg(message) -> None:
     global print_lock
-    print_lock.acquire(True, 1)
+    print_lock.acquire(blocking=True, timeout=1)
     pprint.pprint(message, sort_dicts=False, underscore_numbers=True)
     print_lock.release()
 
 
 def add_new_seeder(ip: str, port: int) -> Seeder:
     global seeders
-    new_peer = Seeder(ip=ip, port=port, file=None)
+    new_peer = Seeder(ip=ip, port=port, file_name=None)
     seeders[new_peer.addr()] = new_peer
     return new_peer
 
 
 def remove_seeder(ip: str, port: int) -> None:
-    seeders_lock.acquire(True, 1)
-    files_lock.acquire(True, 1)
+    global seeders
+    seeders_lock.acquire(blocking=True, timeout=1)
 
     peer_to_remove = seeders.pop(Seeder.key(ip=ip, port=port))
     remove_seeder_files(peer_to_remove)
 
     seeders_lock.release()
-    files_lock.release()
 
 
 def remove_seeder_files(seeder: Seeder) -> None:
-    for name, file_seeders in seeder.files():
-        all_seeders = files[name]
+    global files
+    for file_name in seeder.files():
+        file_seeders = files[file_name].seeders()
         if len(file_seeders) == 1:
-            files.pop(name)
+            files.pop(file_name)
         else:
-            all_seeders.pop(seeder.addr())
+            file_seeders.pop(seeder.addr())
 
 
 def find_seeders_for_file(file_name: str) -> list:
     global files, files_lock, seeders
-    files_lock.acquire(True, 1)
+    files_lock.acquire(blocking=True, timeout=1)
 
     file_seeders = []
+    dead_seeders = []
     if file_name in files.keys():
         for seeder_key in files[file_name].seeders():
             seeder = seeders[seeder_key]
-            if (dt.now() - seeder.heartbeat()).seconds < HEARTBEAT_TIMEOUT:
-                file_seeders.append((seeders[seeder_key].ip(), seeders[seeder_key].port()))
+            if seeder.is_alive():
+                file_seeders.append((seeder.ip(), seeder.port()))
             else:
-                remove_seeder(ip=ip, port=port)
+                dead_seeders.append((seeder.ip(), seeder.port()))
+
+    for ip, port in dead_seeders:
+        remove_seeder(ip=ip, port=port)
 
     files_lock.release()
     return file_seeders
@@ -85,8 +82,8 @@ def add_new_file_and_seeder(ip: str, port: int, file_name: str):
     global files, seeders, seeders_lock, files_lock
     seeder_key = Seeder.key(ip, port)
 
-    files_lock.acquire(True, 1)
-    seeders_lock.acquire(True, 1)
+    files_lock.acquire(blocking=True, timeout=1)
+    seeders_lock.acquire(blocking=True, timeout=1)
 
     if seeder_key in seeders.keys():
         seeder = seeders[seeder_key]
@@ -110,61 +107,8 @@ def add_new_file_and_seeder(ip: str, port: int, file_name: str):
     seeders_lock.release()
 
 
-def create_get_file_log(ip: str, port: int, file_name: str, file_seeders: list) -> None:
-    global get_file_logs, get_file_lock
-    get_file_lock.acquire(True, 1)
-    client = Seeder.key(ip, port)
-    log = GetFileLog(client=client, seeders=file_seeders, file_name=file_name)
-    get_file_logs[GetFileLog.key(client=client, file_name=file_name)] = log
-    get_file_lock.release()
-
-
-def update_get_file_log(ip: str, port: int, file_name: str, uploader_seeder: str, success: bool) -> GetFileLog:
-    global get_file_logs, get_file_lock
-    get_file_lock.acquire(True, 1)
-    client = Seeder.key(ip=ip, port=port)
-    file_key = GetFileLog.key(client=client, file_name=file_name)
-    get_file_logs[file_key] \
-        .set_success(success=success) \
-        .set_uploader_peer(seeder=uploader_seeder)
-    get_file_lock.release()
-    return get_file_logs[file_key]
-
-
-def create_share_file_log(ip: str, port: int, file_name: str) -> ShareFileLog:
-    global share_file_logs, share_file_logs
-    share_file_lock.acquire(True, 1)
-    client = Seeder.key(ip, port)
-    log = ShareFileLog(peer=client, file_name=file_name)
-    share_file_logs[ShareFileLog.key(client, file_name)] = log
-    share_file_lock.release()
-    return log
-
-
-def add_share_log_to_file_log(file_name: str, log: ShareFileLog):
-    global file_logs, file_logs_lock
-    file_logs_lock.acquire(True, 1)
-    if file_name in file_logs.keys():
-        file_logs[file_name].add_share_file_log(log=log)
-    else:
-        file_log = FileLog(file_name=file_name).add_share_file_log(log=log)
-        file_logs[file_name] = file_log
-    file_logs_lock.release()
-
-
-def add_get_log_to_file_log(file_name: str, log: GetFileLog) -> None:
-    global file_logs, file_logs_lock
-    file_logs_lock.acquire(True, 1)
-    if file_name in file_logs:
-        file_logs[file_name].add_get_file_log(log=log)
-    else:
-        file_log = FileLog(file_name).add_get_file_log(log=log)
-        file_logs[file_name] = file_log
-    file_logs_lock.release()
-
-
 def handle_client_share_request(command, ip: str, port: int) -> None:
-    global seeders, share_file_logs, file_logs
+    global seeders
     msg("Pear connected from" + f" {ip}:{port} for share")
 
     file_name = command[1]
@@ -179,7 +123,7 @@ def handle_heartbeat(argv: list, ip: str, port: int) -> str:
     if seeder_key not in seeders.keys():
         return "you are not a seeder!"
 
-    seeders_lock.acquire(True, 1)
+    seeders_lock.acquire(blocking=True, timeout=1)
     seeders[seeder_key].update_heartbeat()
     seeders_lock.release()
     return seeders[seeder_key].formatted_heartbeat()
@@ -248,13 +192,12 @@ def print_user_logs(command):
 
 
 def print_file_logs(command):
-    global file_logs
-
     file_name = command[1]
-    if file_name not in file_logs.keys():
+    logs = get_file_all_logs(file_name)
+    if file_name is None:
         msg(f"there is no log for file : {file_name}")
     else:
-        msg(file_logs[file_name].get_log_formatted())
+        msg(logs)
 
 
 def shout_down(command):
