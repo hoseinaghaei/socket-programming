@@ -16,7 +16,7 @@ class File:
         return self.__seeders
 
 
-class Peer:
+class Seeder:
     def __init__(self, ip, port, file):
         self.__ip = ip
         self.__port = port
