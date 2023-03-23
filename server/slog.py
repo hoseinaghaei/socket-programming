@@ -19,8 +19,8 @@ class GetFileLog:
         self.__finished_at = dt.now()
         return self
 
-    def set_uploader_peer(self, peer: str):
-        self.__server = peer
+    def set_uploader_peer(self, seeder: str):
+        self.__server = seeder
         return self
 
     @staticmethod
