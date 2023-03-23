@@ -1,5 +1,7 @@
 from datetime import datetime as dt
 
+HEARTBEAT_TIMEOUT = 30
+
 
 class File:
     def __init__(self, name: str, seeder: str):
@@ -17,13 +19,13 @@ class File:
 
 
 class Seeder:
-    def __init__(self, ip, port, file):
+    def __init__(self, ip: str, port: int, file_name):
         self.__ip = ip
         self.__port = port
         self.__files = {}
         self.__heartbeat = dt.now()
-        if file is not None:
-            self.__files[file.name()] = file
+        if file_name is not None:
+            self.__files[file_name] = file_name
 
     def add_file(self, file):
         self.__files[file] = file
@@ -55,6 +57,9 @@ class Seeder:
 
     def addr(self):
         return f"{self.__ip}:{self.__port}"
+
+    def is_alive(self):
+        return (dt.now() - self.heartbeat()).seconds < HEARTBEAT_TIMEOUT
 
     @staticmethod
     def key(ip, port):
