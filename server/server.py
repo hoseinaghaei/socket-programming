@@ -1,12 +1,6 @@
 import socket
 import sys
 import pprint
-import asyncio
-import _thread
-from operator import methodcaller
-import threading as thread
-import time
-from datetime import datetime as dt
 from slog import *
 
 from data import Peer, File
@@ -55,7 +49,6 @@ def remove_pear(ip, port):
 
 def remove_peer_files(pear: Peer):
     global files, files_lock
-    files_lock.acquire(True, 1)
 
     for name, file_seeders in pear.files():
         all_seeders = files[name]
@@ -63,8 +56,6 @@ def remove_peer_files(pear: Peer):
             files.pop(name)
         else:
             all_seeders.pop(pear.addr())
-
-    files_lock.release()
 
 
 def find_seeders_for_file(file_name: str):
@@ -77,6 +68,9 @@ def find_seeders_for_file(file_name: str):
             seeder = seeders[seeder_key]
             if (dt.now() - seeder.heartbeat()).seconds < HEARTBEAT_TIMEOUT:
                 file_seeders.append((seeders[seeder_key].ip(), seeders[seeder_key].port()))
+            else:
+                remove_peer_files(seeder)
+                seeders.pop(seeder_key)
 
     files_lock.release()
     return file_seeders
