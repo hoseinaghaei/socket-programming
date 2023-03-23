@@ -11,35 +11,30 @@ files = {}
 files_lock = thread.Lock()
 get_file_logs = {}
 get_file_lock = thread.Lock()
-
 share_file_logs = {}
 share_file_lock = thread.Lock()
-
 file_logs = {}
 file_logs_lock = thread.Lock()
-
 print_lock = thread.Lock()
 
 HEARTBEAT_TIMEOUT = 30
-SERVER_IP = '127.0.0.1'
-SERVER_PORT = 12345
 
 
-def msg(message):
+def msg(message) -> None:
     global print_lock
     print_lock.acquire(True, 1)
     pprint.pprint(message, sort_dicts=False, underscore_numbers=True)
     print_lock.release()
 
 
-def add_pear(ip, port):
+def add_pear(ip: str, port: int) -> Peer:
     global seeders_lock, seeders
     new_peer = Peer(ip=ip, port=port, file=None)
     seeders[new_peer.addr()] = new_peer
     return new_peer
 
 
-def remove_pear(ip, port):
+def remove_pear(ip: str, port: int) -> None:
     global seeders_lock, seeders
     seeders_lock.acquire(blocking=True, timeout=1)
     peer_to_remove = seeders.pop(Peer.key(ip=ip, port=port))
@@ -47,7 +42,7 @@ def remove_pear(ip, port):
     seeders_lock.release()
 
 
-def remove_peer_files(pear: Peer):
+def remove_peer_files(pear: Peer) -> None:
     global files, files_lock
 
     for name, file_seeders in pear.files():
@@ -58,7 +53,7 @@ def remove_peer_files(pear: Peer):
             all_seeders.pop(pear.addr())
 
 
-def find_seeders_for_file(file_name: str):
+def find_seeders_for_file(file_name: str) -> list:
     global files, files_lock, seeders
     files_lock.acquire(True, 1)
 
@@ -69,14 +64,13 @@ def find_seeders_for_file(file_name: str):
             if (dt.now() - seeder.heartbeat()).seconds < HEARTBEAT_TIMEOUT:
                 file_seeders.append((seeders[seeder_key].ip(), seeders[seeder_key].port()))
             else:
-                remove_peer_files(seeder)
-                seeders.pop(seeder_key)
+                remove_pear(ip=ip, port=port)
 
     files_lock.release()
     return file_seeders
 
 
-def handle_client_get_request(command, ip: str, port: int):
+def handle_client_get_request(command, ip: str, port: int) -> list:
     msg("Pear connected from" + f" {ip}:{port} for get")
     global get_file_logs, get_file_lock, file_logs, file_logs_lock
     file_name = command[1]
@@ -88,11 +82,10 @@ def handle_client_get_request(command, ip: str, port: int):
     get_file_logs[GetFileLog.key(client=client, file_name=file_name)] = log
     get_file_lock.release()
 
-    # print("sending : ", file_seeders)
     return file_seeders
 
 
-def handle_client_share_request(command, ip: str, port: int):
+def handle_client_share_request(command, ip: str, port: int) -> str:
     msg("Pear connected from" + f" {ip}:{port} for share")
 
     global seeders, files, files_lock, seeders_lock, share_file_lock, share_file_logs, file_logs, file_logs_lock
@@ -141,7 +134,7 @@ def handle_client_share_request(command, ip: str, port: int):
     return "Success!"
 
 
-def handle_heartbeat(argv: list, ip: str, port: int):
+def handle_heartbeat(argv: list, ip: str, port: int) -> str:
     global seeders, seeders_lock
     seeder_key = Peer.key(ip, port)
     if seeder_key not in seeders.keys():
@@ -153,7 +146,7 @@ def handle_heartbeat(argv: list, ip: str, port: int):
     return seeders[seeder_key].formatted_heartbeat()
 
 
-def handle_download_completed(argv: list, ip: str, port: int):
+def handle_download_completed(argv: list, ip: str, port: int) -> None:
     global seeders, seeders_lock, files, files_lock, get_file_logs, get_file_lock, file_logs, file_logs_lock
     file_name = argv[2]
     seeders_lock.acquire(True, 1)
@@ -215,7 +208,7 @@ message_handler = {
 }
 
 
-def handle_client(message: str, addr, server):
+def handle_client(message: str, addr: tuple, server: socket) -> None:
     global message_handler, seeders
     command = message.split()
     if len(message) != 0 and command[0] in message_handler:
@@ -227,7 +220,6 @@ def handle_client(message: str, addr, server):
     else:
         res = 'Invalid command!'
 
-    # msg(res)
     server.sendto(res.encode(), addr)
 
 
