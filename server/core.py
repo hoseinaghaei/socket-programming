@@ -19,21 +19,19 @@ class File:
 
 
 class Seeder:
-    def __init__(self, ip: str, port: int, file_name):
+    def __init__(self, ip: str, port: int):
         self.__ip = ip
         self.__port = port
         self.__files = {}
         self.__heartbeat = dt.now()
-        if file_name is not None:
-            self.__files[file_name] = file_name
 
-    def add_file(self, file):
-        self.__files[file] = file
+    def add_file(self, file_name: str):
+        self.__files[file_name] = file_name
         return self
 
-    def get_file(self, name):
-        if name in self.__files:
-            return self.__files[name]
+    def get_file(self, file_name: str):
+        if file_name in self.__files:
+            return self.__files[file_name]
         return None
 
     def files(self):
