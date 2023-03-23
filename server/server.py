@@ -20,14 +20,14 @@ def msg(message) -> None:
     print_lock.release()
 
 
-def add_new_seeder(ip: str, port: int) -> Seeder:
+def create_seeder(ip: str, port: int) -> Seeder:
     global seeders
     new_peer = Seeder(ip=ip, port=port, file_name=None)
     seeders[new_peer.addr()] = new_peer
     return new_peer
 
 
-def remove_seeder(ip: str, port: int) -> None:
+def remove_seeder_and_related_files(ip: str, port: int) -> None:
     global seeders
     seeders_lock.acquire(blocking=True, timeout=1)
 
@@ -62,7 +62,7 @@ def find_seeders_for_file(file_name: str) -> list:
                 dead_seeders.append((seeder.ip(), seeder.port()))
 
     for ip, port in dead_seeders:
-        remove_seeder(ip=ip, port=port)
+        remove_seeder_and_related_files(ip=ip, port=port)
 
     files_lock.release()
     return file_seeders
@@ -95,7 +95,7 @@ def add_new_file_and_seeder(ip: str, port: int, file_name: str):
             seeder.add_file(file_name)
             files[file_name] = new_file
     else:
-        new_seeder = add_new_seeder(ip, port)
+        new_seeder = create_seeder(ip, port)
         new_seeder.add_file(file_name)
         if file_name in files.keys():
             files[file_name].add_seeder(seeder_key)
