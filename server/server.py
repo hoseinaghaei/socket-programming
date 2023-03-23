@@ -3,7 +3,7 @@ import sys
 import pprint
 from slog import *
 
-from data import Seeder, File
+from core import Seeder, File
 
 seeders = {}
 seeders_lock = thread.Lock()

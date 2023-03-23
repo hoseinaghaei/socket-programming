@@ -1,6 +1,6 @@
 from datetime import datetime as dt
 import threading as thread
-from data import *
+from core import *
 
 file_lock = thread.Lock()
 
