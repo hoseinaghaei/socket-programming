@@ -1,18 +1,9 @@
 import socket
 import sys
-import pprint
-from slog import *
-from core import *
 
-print_lock = thread.Lock()
+from server_cli import *
+
 BUFFER_SIZE = 1024
-
-
-def msg(message) -> None:
-    global print_lock
-    print_lock.acquire(blocking=True, timeout=1)
-    pprint.pprint(message, sort_dicts=False, underscore_numbers=True)
-    print_lock.release()
 
 
 def handle_client_get_request(command, ip: str, port: int) -> list:
@@ -94,59 +85,6 @@ def handle_client(message: str, addr: tuple, server: socket) -> None:
         res = 'Invalid command!'
 
     server.sendto(res.encode(), addr)
-
-
-def print_request_log(command):
-    msg(get_request_logs())
-
-
-def print_user_logs(command):
-    seeder_key = command[1]
-    msg(get_seeder_all_logs(seeder_key=seeder_key))
-
-
-def print_file_logs(command):
-    file_name = command[1]
-    logs = get_file_all_logs(file_name)
-    if file_name is None:
-        msg(f"there is no log for file : {file_name}")
-    else:
-        msg(logs)
-
-
-def shout_down(command):
-    msg("Server shutting down the input...\nSIGINT to kill the main thread!")
-    exit(-1)
-
-
-def handle_input_cli():
-    command_handler = {
-        'request logs': {
-            'func': 'print_request_log'
-        },
-        'file_logs': {
-            'func': 'print_file_logs'
-        },
-        'quit': {
-            'func': 'shout_down'
-        },
-        'user_logs': {
-            'func': 'print_user_logs'
-        }
-    }
-    while True:
-        command = input()
-        split_command = command.split()
-        if len(command) == 0:
-            continue
-        if command in command_handler:
-            func = globals()[command_handler[command]['func']]
-            func(split_command)
-        elif split_command[0] in command_handler:
-            func = globals()[command_handler[split_command[0]]['func']]
-            func(split_command)
-        else:
-            msg('invalid command!')
 
 
 def get_addr():
