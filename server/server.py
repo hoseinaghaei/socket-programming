@@ -1,51 +1,53 @@
 import socket
 import sys
 
-from server_cli import *
+from server_cli import msg, handle_input_cli
+from slog import *
+from core import *
 
 BUFFER_SIZE = 1024
 
 
-def handle_client_get_request(command, ip: str, port: int) -> list:
-    msg("Pear connected from" + f" {ip}:{port} for get")
+def handle_client_get_request(argv: list, peer_ip: str, peer_port: int) -> list:
+    msg("Pear connected from" + f" {peer_ip}:{peer_port} for get")
 
-    file_name = command[1]
+    file_name = argv[1]
     file_seeders = find_seeders_for_file(file_name)
-    create_get_file_log(ip=ip, port=port, file_name=file_name, file_seeders=file_seeders)
+    create_get_file_log(ip=peer_ip, port=peer_port, file_name=file_name, file_seeders=file_seeders)
 
     return file_seeders
 
 
-def handle_client_share_request(command, ip: str, port: int) -> None:
-    msg("Pear connected from" + f" {ip}:{port} for share")
+def handle_client_share_request(argv: list, seeder_ip: str, seeder_port: int) -> None:
+    msg("Pear connected from" + f" {seeder_ip}:{seeder_port} for share")
 
-    file_name = command[1]
-    add_new_file_and_seeder(ip=ip, port=port, file_name=file_name)
-    log = create_share_file_log(ip=ip, port=port, file_name=file_name)
-    add_share_log_to_file_log(file_name=file_name, log=log)
-    add_share_log_to_user_log(seeder_key=Seeder.key(ip=ip, port=port), log=log)
+    file_name = argv[1]
+    add_new_file_and_seeder(ip=seeder_ip, port=seeder_port, file_name=file_name)
+    log = create_share_file_log(ip=seeder_ip, port=seeder_port, file_name=file_name)
+    add_share_log_to_file_log(file_name=file_name, share_file_log=log)
+    add_share_log_to_user_log(seeder_key=Seeder.key(ip=seeder_ip, port=seeder_port), share_file_log=log)
 
 
-def handle_heartbeat(argv: list, ip: str, port: int) -> str:
-    heartbeat = update_heartbeat(ip=ip, port=port)
+def handle_heartbeat(argv: list, seeder_ip: str, seeder_port: int) -> str:
+    heartbeat = update_heartbeat(ip=seeder_ip, port=seeder_port)
     if heartbeat is None:
         return "you are not a seeder!"
     return heartbeat
 
 
-def handle_download_completed(argv: list, ip: str, port: int) -> None:
+def handle_download_completed(argv: list, new_seeder_ip: str, new_seeder_port: int) -> None:
     file_name = argv[2]
-    add_new_file_and_seeder(ip=ip, port=port, file_name=file_name)
-    log = update_get_file_log(uploader_seeder=argv[4], file_name=file_name, ip=ip, port=port, success=True)
-    add_get_log_to_file_log(file_name=file_name, log=log)
-    add_get_log_to_user_log(seeder_key=Seeder.key(ip=ip, port=port), log=log)
-    add_get_log_to_user_log(seeder_key=argv[4], log=log)
+    add_new_file_and_seeder(ip=new_seeder_ip, port=new_seeder_port, file_name=file_name)
+    log = update_get_file_log(uploader_seeder=argv[4], file_name=file_name, ip=new_seeder_ip, port=new_seeder_port)
+    add_get_log_to_file_log(file_name=file_name, get_file_log=log)
+    add_get_log_to_user_log(seeder_key=Seeder.key(ip=new_seeder_ip, port=new_seeder_port), get_file_log=log)
+    add_get_log_to_user_log(seeder_key=argv[4], get_file_log=log)
 
 
-def handle_download_failed(argv: list, ip: str, port: int):
+def handle_download_failed(argv: list, peer_ip: str, peer_port: int):
     file_name = argv[2]
-    log = update_get_file_log(uploader_seeder=argv[4], file_name=file_name, ip=ip, port=port, success=False)
-    add_get_log_to_file_log(file_name=file_name, log=log)
+    log = update_get_file_log(uploader_seeder=argv[4], file_name=file_name, ip=peer_ip, port=peer_port, success=False)
+    add_get_log_to_file_log(file_name=file_name, get_file_log=log)
 
 
 message_handler = {
@@ -98,7 +100,7 @@ def get_addr():
     return addr
 
 
-def start_to_listen(ip: str, port: int):
+def listen(ip: str, port: int):
     msg("Server is running on " + f"{ip}:{port}")
     thread.Thread(target=handle_input_cli).start()
     server = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
@@ -110,5 +112,5 @@ def start_to_listen(ip: str, port: int):
 
 
 if __name__ == '__main__':
-    ip, port = get_addr()
-    start_to_listen(ip, int(port))
+    tracker_ip, tracker_port = get_addr()
+    listen(ip=tracker_ip, port=int(tracker_port))

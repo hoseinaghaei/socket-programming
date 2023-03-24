@@ -19,7 +19,7 @@ def create_get_file_log(ip: str, port: int, file_name: str, file_seeders: list) 
     __get_file_lock.release()
 
 
-def update_get_file_log(ip: str, port: int, file_name: str, uploader_seeder: str, success: bool) -> GetFileLog:
+def update_get_file_log(ip: str, port: int, file_name: str, uploader_seeder: str, success=True) -> GetFileLog:
     global __get_file_logs, __get_file_lock
     __get_file_lock.acquire(True, 1)
     client = Seeder.key(ip=ip, port=port)
@@ -41,49 +41,49 @@ def create_share_file_log(ip: str, port: int, file_name: str) -> ShareFileLog:
     return log
 
 
-def add_share_log_to_file_log(file_name: str, log: ShareFileLog):
+def add_share_log_to_file_log(file_name: str, share_file_log: ShareFileLog):
     global __file_logs, __file_logs_lock
     __file_logs_lock.acquire(True, 1)
     if file_name in __file_logs.keys():
-        __file_logs[file_name].add_share_file_log(log=log)
+        __file_logs[file_name].add_share_file_log(log=share_file_log)
     else:
-        file_log = FileLog(file_name=file_name).add_share_file_log(log=log)
+        file_log = FileLog(file_name=file_name).add_share_file_log(log=share_file_log)
         __file_logs[file_name] = file_log
     __file_logs_lock.release()
 
 
-def add_get_log_to_file_log(file_name: str, log: GetFileLog) -> None:
+def add_get_log_to_file_log(file_name: str, get_file_log: GetFileLog) -> None:
     global __file_logs, __file_logs_lock
     __file_logs_lock.acquire(True, 1)
 
     if file_name in __file_logs:
-        __file_logs[file_name].add_get_file_log(log=log)
+        __file_logs[file_name].add_get_file_log(log=get_file_log)
     else:
-        file_log = FileLog(file_name).add_get_file_log(log=log)
+        file_log = FileLog(file_name).add_get_file_log(log=get_file_log)
         __file_logs[file_name] = file_log
     __file_logs_lock.release()
 
 
-def add_share_log_to_user_log(seeder_key: str, log: ShareFileLog):
+def add_share_log_to_user_log(seeder_key: str, share_file_log: ShareFileLog):
     global __seeder_logs, __seeder_logs_lock
 
     __seeder_logs_lock.acquire(True, 1)
     if seeder_key in __seeder_logs.keys():
-        __seeder_logs[seeder_key].add_share_file_log(log=log)
+        __seeder_logs[seeder_key].add_share_file_log(log=share_file_log)
     else:
-        seeder_log = SeederLog(seeder_key=seeder_key).add_share_file_log(log=log)
+        seeder_log = SeederLog(seeder_key=seeder_key).add_share_file_log(log=share_file_log)
         __seeder_logs[seeder_key] = seeder_log
     __seeder_logs_lock.release()
 
 
-def add_get_log_to_user_log(seeder_key: str, log: GetFileLog) -> None:
+def add_get_log_to_user_log(seeder_key: str, get_file_log: GetFileLog) -> None:
     global __seeder_logs, __seeder_logs_lock
 
     __seeder_logs_lock.acquire(True, 1)
     if seeder_key in __seeder_logs.keys():
-        __seeder_logs[seeder_key].add_get_file_log(log=log)
+        __seeder_logs[seeder_key].add_get_file_log(log=get_file_log)
     else:
-        seeder_log = SeederLog(seeder_key=seeder_key).add_get_file_log(log=log)
+        seeder_log = SeederLog(seeder_key=seeder_key).add_get_file_log(log=get_file_log)
         __seeder_logs[seeder_key] = seeder_log
     __seeder_logs_lock.release()
 
