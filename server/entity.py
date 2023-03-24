@@ -153,6 +153,7 @@ class FileLog:
 class SeederLog:
     def __init__(self, seeder_key: str):
         self.__seeder_key = seeder_key
+        self.__heartbeat = dt.now()
         self.__get_file_logs = []
         self.__share_file_logs = []
 
@@ -163,6 +164,9 @@ class SeederLog:
     def add_share_file_log(self, log: ShareFileLog):
         self.__share_file_logs.append(log)
         return self
+
+    def update_heartbeat(self):
+        self.__heartbeat = dt.now()
 
     def get_log_formatted(self):
         get_file = []
@@ -175,6 +179,7 @@ class SeederLog:
 
         return {
             'seeder': self.__seeder_key,
+            'last_heartbeat': self.__heartbeat.strftime("%Y-%m-%d %H:%M:%S"),
             'get_log': get_file,
             'share_log': share_file
         }

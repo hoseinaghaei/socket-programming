@@ -88,6 +88,19 @@ def add_get_log_to_user_log(seeder_key: str, get_file_log: GetFileLog) -> None:
     __seeder_logs_lock.release()
 
 
+def update_seeder_last_heartbeat_log(seeder_key: str) -> None:
+    global __seeder_logs, __seeder_logs_lock
+
+    __seeder_logs_lock.acquire(blocking=True, timeout=1)
+    if seeder_key in __seeder_logs.keys():
+        __seeder_logs[seeder_key].update_heartbeat()
+    else:
+        seeder_log = SeederLog(seeder_key=seeder_key)
+        __seeder_logs[seeder_key] = seeder_log
+
+    __seeder_logs_lock.release()
+
+
 def get_file_all_logs(file_name: str):
     global __file_logs
     if file_name not in __file_logs.keys():

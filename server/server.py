@@ -32,6 +32,7 @@ def handle_heartbeat(argv: list, seeder_ip: str, seeder_port: int) -> str:
     heartbeat = update_heartbeat(ip=seeder_ip, port=seeder_port)
     if heartbeat is None:
         return "you are not a seeder!"
+    update_seeder_last_heartbeat_log(Seeder.key(ip=seeder_ip, port=seeder_port))
     return heartbeat
 
 
