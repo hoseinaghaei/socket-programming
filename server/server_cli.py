@@ -11,11 +11,11 @@ def msg(message) -> None:
     print_lock.release()
 
 
-def print_request_log(argv: list):
+def __print_request_log(argv: list):
     msg(get_request_logs())
 
 
-def print_user_logs(argv: list):
+def __print_user_logs(argv: list):
     seeder_key = argv[1]
     logs = get_seeder_all_logs(seeder_key=seeder_key)
     if logs is None:
@@ -24,7 +24,7 @@ def print_user_logs(argv: list):
         msg(logs)
 
 
-def print_file_logs(argv: list):
+def __print_file_logs(argv: list):
     file_name = argv[1]
     logs = get_file_all_logs(file_name)
     if file_name is None:
@@ -33,23 +33,23 @@ def print_file_logs(argv: list):
         msg(logs)
 
 
-def shout_down(argv: list):
+def __shout_down(argv: list):
     msg("Server shutting down the input...\nSIGINT to kill the main thread!")
     exit(-1)
 
 
 command_handler = {
     'request logs': {
-        'func': 'print_request_log'
+        'func': '__print_request_log'
     },
     'file_logs': {
-        'func': 'print_file_logs'
+        'func': '__print_file_logs'
     },
     'quit': {
-        'func': 'shout_down'
+        'func': '__shout_down'
     },
     'user_logs': {
-        'func': 'print_user_logs'
+        'func': '__print_user_logs'
     }
 }
 
