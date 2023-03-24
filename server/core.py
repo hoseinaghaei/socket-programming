@@ -1,7 +1,5 @@
-from datetime import datetime as dt
 import threading as thread
-
-HEARTBEAT_TIMEOUT = 30
+from entity import *
 
 __seeders = {}
 __seeders_lock = thread.Lock()
