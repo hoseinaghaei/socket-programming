@@ -2,8 +2,6 @@ from datetime import datetime as dt
 import threading as thread
 from core import *
 
-file_lock = thread.Lock()
-
 __get_file_logs = {}
 __get_file_lock = thread.Lock()
 __share_file_logs = {}
@@ -59,6 +57,7 @@ def add_share_log_to_file_log(file_name: str, log: ShareFileLog):
 def add_get_log_to_file_log(file_name: str, log: GetFileLog) -> None:
     global __file_logs, __file_logs_lock
     __file_logs_lock.acquire(True, 1)
+
     if file_name in __file_logs:
         __file_logs[file_name].add_get_file_log(log=log)
     else:
@@ -67,9 +66,56 @@ def add_get_log_to_file_log(file_name: str, log: GetFileLog) -> None:
     __file_logs_lock.release()
 
 
+def add_share_log_to_user_log(seeder_key: str, log: ShareFileLog):
+    global __seeder_logs, __seeder_logs_lock
+
+    __seeder_logs_lock.acquire(True, 1)
+    if seeder_key in __seeder_logs.keys():
+        __seeder_logs[seeder_key].add_share_file_log(log=log)
+    else:
+        seeder_log = SeederLog(seeder_key=seeder_key).add_share_file_log(log=log)
+        __seeder_logs[seeder_key] = seeder_log
+    __seeder_logs_lock.release()
+
+
+def add_get_log_to_user_log(seeder_key: str, log: GetFileLog) -> None:
+    global __seeder_logs, __seeder_logs_lock
+
+    __seeder_logs_lock.acquire(True, 1)
+    if seeder_key in __seeder_logs.keys():
+        __seeder_logs[seeder_key].add_get_file_log(log=log)
+    else:
+        seeder_log = SeederLog(seeder_key=seeder_key).add_get_file_log(log=log)
+        __seeder_logs[seeder_key] = seeder_log
+    __seeder_logs_lock.release()
+
+
 def get_file_all_logs(file_name: str):
     global __file_logs
     if file_name not in __file_logs.keys():
         return None
     else:
         return __file_logs[file_name].get_log_formatted()
+
+
+def get_seeder_all_logs(seeder_key: str):
+    global __file_logs
+    if seeder_key not in __seeder_logs.keys():
+        return None
+    else:
+        return __seeder_logs[seeder_key].get_log_formatted()
+
+
+def get_request_logs():
+    get_file = []
+    for i in __get_file_logs:
+        get_file.append(i.get_log_formatted())
+
+    share_file = []
+    for i in __share_file_logs:
+        share_file.append(i.get_log_formatted())
+
+    return {
+        'get_log': get_file,
+        'share_log': share_file
+    }

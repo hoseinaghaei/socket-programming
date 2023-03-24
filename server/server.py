@@ -5,6 +5,7 @@ from slog import *
 from core import *
 
 print_lock = thread.Lock()
+BUFFER_SIZE = 1024
 
 
 def msg(message) -> None:
@@ -31,6 +32,7 @@ def handle_client_share_request(command, ip: str, port: int) -> None:
     add_new_file_and_seeder(ip=ip, port=port, file_name=file_name)
     log = create_share_file_log(ip=ip, port=port, file_name=file_name)
     add_share_log_to_file_log(file_name=file_name, log=log)
+    add_share_log_to_user_log(seeder_key=Seeder.key(ip=ip, port=port), log=log)
 
 
 def handle_heartbeat(argv: list, ip: str, port: int) -> str:
@@ -45,10 +47,14 @@ def handle_download_completed(argv: list, ip: str, port: int) -> None:
     add_new_file_and_seeder(ip=ip, port=port, file_name=file_name)
     log = update_get_file_log(uploader_seeder=argv[4], file_name=file_name, ip=ip, port=port, success=True)
     add_get_log_to_file_log(file_name=file_name, log=log)
+    add_get_log_to_user_log(seeder_key=Seeder.key(ip=ip, port=port), log=log)
+    add_get_log_to_user_log(seeder_key=argv[4], log=log)
 
 
 def handle_download_failed(argv: list, ip: str, port: int):
-    pass
+    file_name = argv[2]
+    log = update_get_file_log(uploader_seeder=argv[4], file_name=file_name, ip=ip, port=port, success=False)
+    add_get_log_to_file_log(file_name=file_name, log=log)
 
 
 message_handler = {
@@ -76,7 +82,7 @@ message_handler = {
 
 
 def handle_client(message: str, addr: tuple, server: socket) -> None:
-    global message_handler, seeders
+    global message_handler
     command = message.split()
     if len(message) != 0 and command[0] in message_handler:
         if len(command) != message_handler[command[0]]['argc']:
@@ -91,15 +97,12 @@ def handle_client(message: str, addr: tuple, server: socket) -> None:
 
 
 def print_request_log(command):
-    msg("print_request_log triggerd!")
-
-    print(command)
+    msg(get_request_logs())
 
 
 def print_user_logs(command):
-    global seeders
-    msg("print_user_logs triggerd!")
-    msg(seeders[command[2]])
+    seeder_key = command[1]
+    msg(get_seeder_all_logs(seeder_key=seeder_key))
 
 
 def print_file_logs(command):
@@ -163,9 +166,8 @@ def start_to_listen(ip: str, port: int):
     server = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     server.bind((ip, port))
 
-    buffer_size = 1024
     while True:
-        message, addr = server.recvfrom(buffer_size)
+        message, addr = server.recvfrom(BUFFER_SIZE)
         thread.Thread(target=handle_client, args=[message.decode(), addr, server]).start()
 
 
