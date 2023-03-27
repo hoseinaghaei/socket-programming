@@ -1,16 +1,14 @@
+import os.path as path
+import random
 import socket
 import sys
-import os.path as path
-import asyncio
-import _thread
-from operator import methodcaller
 import threading as thread
-import random
-from datetime import datetime as dt
-from clog import Address
 
-files = {}
-files_lock = thread.Lock()
+from entity import Address
+from clog import create_share_file_log, create_get_file_log
+
+__files = {}
+__files_lock = thread.Lock()
 print_lock = thread.Lock()
 
 tracker = Address()
@@ -18,6 +16,7 @@ me = Address()
 LISTEN_QUEUE_SIZE = 5
 BUFFER_SIZE = 1024
 HEARTBEAT_INTERVAL = 10
+WAITING_COUNT_FOR_RELATED_RESPONSE = 5
 
 
 def get_argv():
@@ -44,75 +43,87 @@ def msg(message):
     print_lock.release()
 
 
+def quit(message: str, client: socket):
+    client.close()
+    msg(message=message)
+    exit(-1)
+
+
 def send_heartbeat():
     global tracker, me
     client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client.bind(me.addr())
     client.sendto(b"heartbeat", tracker.addr())
-    message, addr = client.recvfrom(BUFFER_SIZE)
-    msg(f"heartbeat : {message.decode()}")
     client.close()
 
 
 def handle_heartbeat():
+    global HEARTBEAT_INTERVAL
     thread.Timer(HEARTBEAT_INTERVAL, handle_heartbeat).start()
     send_heartbeat()
 
 
-def handle_request_share(file_addr: str):
-    global files, files_lock, tracker, me
-    if not path.isfile(file_addr):
+def __add_new_file(file_name: str, file_address: str, size: int):
+    global __files, __files_lock
+    __files_lock.acquire(True, 1)
+    __files[file_name] = {
+        'address': file_address,
+        'size': size
+    }
+    __files_lock.release()
+
+
+def handle_request_share(file_address: str) -> None:
+    global __files, __files_lock, tracker, me
+    if not path.isfile(file_address):
         msg("file does not exist!")
         exit(-1)
 
-    file_name = file_addr.split('/')[-1]
-    files_lock.acquire(True, 1)
-    files[file_name] = {
-        'address': file_addr,
-        'size': path.getsize(file_addr)
-    }
-    files_lock.release()
+    file_name = file_address.split('/')[-1]
 
     message = f"share {file_name}"
 
     client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     client.bind(me.addr())
     client.sendto(message.encode(), tracker.addr())
+    for i in range(WAITING_COUNT_FOR_RELATED_RESPONSE):
+        response, addr = client.recvfrom(BUFFER_SIZE)
+        if response.decode() == f"{message} done":
+            __add_new_file(file_name=file_name, file_address=file_address, size=path.getsize(file_addr))
+            client.close()
+            return
+
+    quit("share file failed", client)
 
 
-def download(peer_addr, file_name):
-    global files, files_lock, me
+def download(peer_addr: tuple, file_name: str):
+    global __files, __files_lock, me
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
         client.bind(me.addr())
-        client.connect(peer_addr)
-        client.send(f"get {file_name}".encode())
-        file_size = client.recv(BUFFER_SIZE).decode()
-
-        while not file_size.isdigit():
+        try:
+            client.connect(peer_addr)
+            client.send(f"get {file_name}".encode())
             file_size = client.recv(BUFFER_SIZE).decode()
 
-        msg(f"size : {file_size}")
-        if file_size == 0:
-            msg("ho")
+            while not file_size.isdigit():
+                file_size = client.recv(BUFFER_SIZE).decode()
+
+            if file_size == 0:
+                return False
+
+            me.create_dir_if_does_not_exist()
+            file_address = f"{me.dir()}/{file_name}"
+            with open(file_address, "wb+") as f:
+                while True:
+                    bytes_read = client.recv(BUFFER_SIZE)
+                    if not bytes_read:
+                        break
+                    f.write(bytes_read)
+        except:
+            client.close()
             return False
 
-        # me.create_dir_if_does_not_exist()
-        file_addr = f"{me.dir()}/{file_name}"
-        msg(file_addr)
-        with open(file_addr, "wb+") as f:
-            while True:
-                bytes_read = client.recv(BUFFER_SIZE)
-                if not bytes_read:
-                    break
-                f.write(bytes_read)
-
-    files_lock.acquire(True, 1)
-    files[file_name] = {
-        'address': file_addr,
-        'size': file_size
-    }
-    msg(files)
-    files_lock.release()
+    __add_new_file(file_name=file_name, file_address=file_address, size=int(file_size))
     return True
 
 
@@ -120,39 +131,42 @@ def handle_request_get(file_name: str):
     global tracker, me
     message = f"get {file_name}"
 
-    client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    client.bind(me.addr())
-    client.sendto(message.encode(), tracker.addr())
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as client:
+        client.bind(me.addr())
+        client.sendto(message.encode(), tracker.addr())
 
-    message, addr = client.recvfrom(BUFFER_SIZE)
-    while addr != tracker.addr():
-        message, addr = client.recvfrom(BUFFER_SIZE)
+        for i in range(WAITING_COUNT_FOR_RELATED_RESPONSE):
+            message, addr = client.recvfrom(BUFFER_SIZE)
+            message = message.decode()
+            if message.startswith("seeders"):
+                message = eval(message.split(':')[-1])
+                if type(message) != list or len(message) < 1:
+                    quit("There is no seeder for this file", client)
 
-    message = eval(message.decode())
-    if len(message) < 1:
-        msg('There is no seeder for this file')
-        exit(-1)
+                peer_to_download = message[random.randint(0, len(message) - 1)]
 
-    peer_to_download = message[random.randint(0, len(message) - 1)]
-    msg(peer_to_download)
+                download_success = download(tuple(peer_to_download), file_name)
+                if download_success:
+                    response = f"done download {file_name} from {peer_to_download[0]}:{peer_to_download[1]}"
+                else:
+                    response = f"failed download {file_name} from {peer_to_download[0]}:{peer_to_download[1]}"
+                client.sendto(response.encode(), tracker.addr())
+                if not download_success:
+                    quit('download file failed', client)
+                create_get_file_log(file_name=file_name, peer=peer_to_download, seeders=message)
+                return
 
-    if download(tuple(peer_to_download), file_name):
-        message = f"done download {file_name} from {peer_to_download[0]}:{peer_to_download[1]}"
-        me.create_dir_if_does_not_exist()
-    else:
-        message = f"failed download {file_name} from {peer_to_download[0]}:{peer_to_download[1]}"
-
-    client.sendto(message.encode(), tracker.addr())
-    client.close()
+    quit("get file failed", client)
 
 
 def handle_download_request(connection, addr):
-    global files
+    global __files
     message = connection.recv(BUFFER_SIZE).decode().split()
-    if len(message) != 2 or message[0] != 'get' or message[1] not in files.keys():
+    if len(message) != 2 or message[0] != 'get' or message[1] not in __files.keys():
         size = 0
     else:
-        size = files[message[1]]['size']
+        size = __files[message[1]]['size']
+        msg(f"Peer connected from {addr} to get {message[1]}")
 
     connection.send(str(size).encode())
     connection.send("".encode())
@@ -160,7 +174,7 @@ def handle_download_request(connection, addr):
     if size == 0:
         connection.close()
     else:
-        with open(files[message[1]]['address'], "rb") as f:
+        with open(__files[message[1]]['address'], "rb") as f:
             while True:
                 bytes_read = f.read(BUFFER_SIZE)
                 if not bytes_read:
@@ -168,6 +182,7 @@ def handle_download_request(connection, addr):
 
                 connection.send(bytes_read)
             connection.close()
+        create_share_file_log(file_name=message[1], peer=str(addr), success=True)
 
 
 command_handler = {
@@ -201,9 +216,7 @@ def start_client(command: str, file_name: str):
 
 
 if __name__ == '__main__':
-    # global tracker, me
-    command, file_name, tracker_ip, tracker_port, listen_ip, listen_port = get_argv()
+    command, file_addr, tracker_ip, tracker_port, listen_ip, listen_port = get_argv()
     me.set_ip(listen_ip).set_port(listen_port)
     tracker.set_ip(tracker_ip).set_port(tracker_port)
-    me.create_dir_if_does_not_exist()
-    start_client(command, file_name)
+    start_client(command, file_addr)
