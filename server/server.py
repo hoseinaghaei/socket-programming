@@ -8,17 +8,17 @@ from core import *
 BUFFER_SIZE = 1024
 
 
-def handle_client_get_request(argv: list, peer_ip: str, peer_port: int) -> list:
+def handle_client_get_request(argv: list, peer_ip: str, peer_port: int) -> str:
     msg("Pear connected from" + f" {peer_ip}:{peer_port} for get")
 
     file_name = argv[1]
     file_seeders = find_seeders_for_file(file_name)
     create_get_file_log(ip=peer_ip, port=peer_port, file_name=file_name, file_seeders=file_seeders)
 
-    return file_seeders
+    return f"seeders :{file_seeders}"
 
 
-def handle_client_share_request(argv: list, seeder_ip: str, seeder_port: int) -> None:
+def handle_client_share_request(argv: list, seeder_ip: str, seeder_port: int) -> str:
     msg("Pear connected from" + f" {seeder_ip}:{seeder_port} for share")
 
     file_name = argv[1]
@@ -26,6 +26,7 @@ def handle_client_share_request(argv: list, seeder_ip: str, seeder_port: int) ->
     log = create_share_file_log(ip=seeder_ip, port=seeder_port, file_name=file_name)
     add_share_log_to_file_log(file_name=file_name, share_file_log=log)
     add_share_log_to_user_log(seeder_key=Seeder.key(ip=seeder_ip, port=seeder_port), share_file_log=log)
+    return f"share {file_name} done"
 
 
 def handle_heartbeat(argv: list, seeder_ip: str, seeder_port: int) -> str:
