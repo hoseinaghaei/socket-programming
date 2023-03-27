@@ -1,24 +1,23 @@
-import os as os
+from entity import *
+import threading as thread
+
+__get_file_logs = {}
+__get_file_lock = thread.Lock()
+__send_file_logs = []
+__send_file_lock = thread.Lock()
 
 
-class Address:
-    def __init__(self, ip='', port=0):
-        self.__ip = ip
-        self.__port = port
+def create_get_file_log(file_name: str, peer: str, seeders: list) -> None:
+    global __get_file_logs, __get_file_lock
+    __get_file_lock.acquire(blocking=True, timeout=1)
+    log = GetFileLog(file_name=file_name, peer=peer, seeders=seeders)
+    __get_file_logs[file_name] = log
+    __get_file_lock.release()
 
-    def addr(self):
-        return tuple([self.__ip, self.__port])
 
-    def set_ip(self, ip: str):
-        self.__ip = ip
-        return self
-
-    def set_port(self, port: int):
-        self.__port = port
-        return self
-
-    def dir(self):
-        return f"{self.__port}"
-
-    def create_dir_if_does_not_exist(self):
-        os.makedirs(name=f"{os.getcwd()}/{self.dir()}", exist_ok=True)
+def create_share_file_log(file_name: str, peer: str, success: bool) -> None:
+    global __send_file_logs, __send_file_lock
+    __send_file_lock.acquire(blocking=True, timeout=1)
+    log = SendFileLog(file_name=file_name, peer=peer, success=success)
+    __send_file_logs.append(log)
+    __send_file_lock.release()
