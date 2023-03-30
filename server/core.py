@@ -31,8 +31,9 @@ def find_seeders_for_file(file_name: str) -> list:
     for ip, port in dead_seeders:
         __remove_seeder_with_related_files(ip=ip, port=port)
 
+
     __files_lock.release()
-    return file_seeders
+    return file_seeders, dead_seeders
 
 
 def add_new_file_and_seeder(ip: str, port: int, file_name: str):

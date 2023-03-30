@@ -12,8 +12,10 @@ def handle_client_get_request(argv: list, peer_ip: str, peer_port: int) -> str:
     msg("Pear connected from" + f" {peer_ip}:{peer_port} for get")
 
     file_name = argv[1]
-    file_seeders = find_seeders_for_file(file_name)
+    file_seeders, dead_seeders = find_seeders_for_file(file_name)
     create_get_file_log(ip=peer_ip, port=peer_port, file_name=file_name, file_seeders=file_seeders)
+    for seeder in dead_seeders:
+        msg(f"Peer {seeder} disconnected!")
 
     return f"seeders :{file_seeders}"
 
