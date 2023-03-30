@@ -49,6 +49,12 @@ def handle_download_completed(argv: list, new_seeder_ip: str, new_seeder_port: i
     add_get_log_to_user_log(seeder_key=Seeder.key(ip=new_seeder_ip, port=new_seeder_port), get_file_log=log)
     add_get_log_to_user_log(seeder_key=argv[4], get_file_log=log)
 
+    log = create_share_file_log(ip=new_seeder_ip, port=new_seeder_port, file_name=file_name)
+    add_share_log_to_file_log(file_name=file_name, share_file_log=log)
+    add_share_log_to_user_log(seeder_key=Seeder.key(ip=new_seeder_ip, port=new_seeder_port), share_file_log=log)
+
+    msg(f"New seeder {Seeder.key(new_seeder_ip, new_seeder_port)} added for {file_name}")
+
 
 def handle_download_failed(argv: list, peer_ip: str, peer_port: int):
     file_name = argv[2]
