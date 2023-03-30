@@ -97,28 +97,27 @@ def download(peer_addr: tuple, file_name: str):
         try:
             client.connect(peer_addr)
             client.send(f"get {file_name}".encode())
-            file_size = client.recv(BUFFER_SIZE).decode()
+            for i in range(WAITING_COUNT_FOR_RELATED_RESPONSE):
+                response = client.recv(BUFFER_SIZE).decode()
+                if response.startswith('\nsize:'):
+                    file_size = response.split('\n')[1].split(':')[-1]
+                    if not file_size.isdigit() or file_size == 0:
+                        return False
 
-            while not file_size.isdigit():
-                file_size = client.recv(BUFFER_SIZE).decode()
-
-            if file_size == 0:
-                return False
-
-            me.create_dir_if_does_not_exist()
-            file_address = f"{me.dir()}/{file_name}"
-            with open(file_address, "wb+") as f:
-                while True:
-                    bytes_read = client.recv(BUFFER_SIZE)
-                    if not bytes_read:
-                        break
-                    f.write(bytes_read)
+                    me.create_dir_if_does_not_exist()
+                    file_address = f"{me.dir()}/{file_name}"
+                    with open(file_address, "wb+") as f:
+                        while True:
+                            bytes_read = client.recv(BUFFER_SIZE)
+                            if not bytes_read:
+                                break
+                            f.write(bytes_read)
+                    __add_new_file(file_name=file_name, file_address=file_address, size=int(file_size))
+                    return True
+            return False
         except:
             client.close()
             return False
-
-    __add_new_file(file_name=file_name, file_address=file_address, size=int(file_size))
-    return True
 
 
 def handle_request_get(file_name: str):
@@ -126,6 +125,7 @@ def handle_request_get(file_name: str):
     message = f"get {file_name}"
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as client:
+        # socket.setdefaulttimeout(1) todo: handle wait indefinitely
         client.bind(me.addr())
         client.sendto(message.encode(), tracker.addr())
 
@@ -144,6 +144,7 @@ def handle_request_get(file_name: str):
                     response = f"done download {file_name} from {peer_to_download[0]}:{peer_to_download[1]}"
                 else:
                     response = f"failed download {file_name} from {peer_to_download[0]}:{peer_to_download[1]}"
+                msg(response)
                 client.sendto(response.encode(), tracker.addr())
                 if not download_success:
                     quit('download file failed', client)
@@ -162,21 +163,25 @@ def handle_download_request(connection, addr):
         size = __files[message[1]]['size']
         msg(f"Peer connected from {addr} to get {message[1]}")
 
-    connection.send(str(size).encode())
-    connection.send("".encode())
+    try:
+        connection.send(f"\nsize:{size}\n".encode())
+        connection.sendall("".encode())
 
-    if size == 0:
-        connection.close()
-    else:
-        with open(__files[message[1]]['address'], "rb") as f:
-            while True:
-                bytes_read = f.read(BUFFER_SIZE)
-                if not bytes_read:
-                    break
-
-                connection.send(bytes_read)
+        if size == 0:
             connection.close()
-        create_share_file_log(file_name=message[1], peer=str(addr), success=True)
+        else:
+            with open(__files[message[1]]['address'], "rb") as f:
+                while True:
+                    bytes_read = f.read(BUFFER_SIZE)
+                    if not bytes_read:
+                        break
+
+                    connection.send(bytes_read)
+                connection.close()
+            create_share_file_log(file_name=message[1], peer=str(addr), success=True)
+    except:
+        connection.close()
+        create_share_file_log(file_name=message[1], peer=str(addr), success=False)
 
 
 command_handler = {
