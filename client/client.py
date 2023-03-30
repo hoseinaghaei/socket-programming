@@ -6,6 +6,7 @@ import threading as thread
 
 from entity import Address
 from clog import create_share_file_log, create_get_file_log
+from client_cli import handle_input_cli, msg
 
 __files = {}
 __files_lock = thread.Lock()
@@ -34,13 +35,6 @@ def get_argv():
             exit(-1)
 
         return sys.argv[1], sys.argv[2], tracker_addr[0], int(tracker_addr[1]), listen_addr[0], int(listen_addr[1])
-
-
-def msg(message):
-    global print_lock
-    print_lock.acquire(True, 1)
-    print(message, flush=True)
-    print_lock.release()
 
 
 def quit(message: str, client: socket):
@@ -191,9 +185,6 @@ command_handler = {
     },
     'share': {
         'func': 'handle_request_share'
-    },
-    'user logs': {
-        'func': 'print_user_logs'
     }
 }
 
@@ -206,6 +197,7 @@ def start_client(command: str, file_name: str):
         func(file_name)
 
         thread.Thread(target=handle_heartbeat).start()
+        thread.Thread(target=handle_input_cli).start()
 
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client.bind(me.addr())
