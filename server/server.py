@@ -60,6 +60,8 @@ def handle_download_failed(argv: list, peer_ip: str, peer_port: int):
     file_name = argv[2]
     log = update_get_file_log(uploader_seeder=argv[4], file_name=file_name, ip=peer_ip, port=peer_port, success=False)
     add_get_log_to_file_log(file_name=file_name, get_file_log=log)
+    add_get_log_to_user_log(seeder_key=Seeder.key(ip=peer_ip, port=peer_port), get_file_log=log)
+    add_get_log_to_user_log(seeder_key=argv[4], get_file_log=log)
 
 
 message_handler = {
