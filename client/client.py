@@ -91,6 +91,7 @@ def handle_request_share(file_address: str) -> None:
 
 
 def download(peer_addr: tuple, file_name: str):
+    msg(f"download {file_name} from {peer_addr}")
     global __files, __files_lock, me
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
         client.bind(me.addr())
@@ -101,6 +102,7 @@ def download(peer_addr: tuple, file_name: str):
                 response = client.recv(BUFFER_SIZE).decode()
                 if response.startswith('\nsize:'):
                     file_size = response.split('\n')[1].split(':')[-1]
+                    msg(f"file size: {file_size}")
                     if not file_size.isdigit() or file_size == 0:
                         return False
 
